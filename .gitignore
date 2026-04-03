@@ -1,0 +1,16 @@
+# Dependencias
+node_modules/
+
+# Secretos y entorno local
+.env
+.env.*
+!.env.example
+
+# Sesión WhatsApp (no subir nunca)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Sistema / IDE
+.DS_Store
+*.log
+npm-debug.log*
