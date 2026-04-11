@@ -5,11 +5,57 @@
 // - Mantiene en memoria el historial de los últimos 5 mensajes del grupo objetivo.
 // - Llama al servicio de IA para generar respuestas contextuales.
 
+console.log(
+  '[BOOT]',
+  new Date().toISOString(),
+  'Proceso arrancado (si usás PM2, esto debería verse al instante en los logs).'
+);
+
+process.on('unhandledRejection', (reason) => {
+  const msg =
+    typeof reason === 'string'
+      ? reason
+      : reason && (reason.message || String(reason));
+  const name = reason && reason.name;
+  if (
+    name === 'TargetCloseError' ||
+    (typeof msg === 'string' && msg.includes('Target closed'))
+  ) {
+    console.error(
+      '[BOOT] Chromium/Puppeteer se cerró de golpe (casi siempre falta de RAM en VM chica). ' +
+        'Añadí swap de 2G, dejá un solo proceso PM2 (fork), esperá unos minutos y reiniciá. Detalle:',
+      msg
+    );
+    return;
+  }
+  if (msg === 'auth timeout' || msg === 'ready timeout') {
+    console.error(
+      '[BOOT] Timeout interno de whatsapp-web.js (' +
+        msg +
+        '). En .env probá WWEBJS_AUTH_TIMEOUT_MS=600000 y asegurate de tener swap (2G).'
+    );
+    return;
+  }
+  if (
+    name === 'ProtocolError' ||
+    (typeof msg === 'string' &&
+      (msg.includes('callFunctionOn timed out') || msg.includes('protocolTimeout')))
+  ) {
+    console.error(
+      '[BOOT] Puppeteer protocolTimeout demasiado bajo para esta VM. En .env: PUPPETEER_PROTOCOL_TIMEOUT_MS=900000 (o más). Detalle:',
+      msg
+    );
+    return;
+  }
+  console.error('[BOOT] Promesa rechazada sin catch:', reason);
+});
+
 const { createWhatsappClient } = require('./services/whatsapp.service');
 const { generateAIResponse } = require('./services/ai.service');
 const { TARGET_GROUP_ID, BOT_OWNER_PHONE } = require('./config');
 const {
   getMessageChatId,
+  isSystemBroadcastChat,
   isTargetGroup,
   extractPhoneNumber,
   getSenderPhoneDigits,
@@ -182,9 +228,11 @@ async function replyFromBot(toMessage, text) {
  */
 async function tryHandleOwnerCommands(message, body) {
   const inTargetGroup = isTargetGroup(message, TARGET_GROUP_ID);
-  const fromPrivate = Boolean(
-    message.from && !message.from.endsWith('@g.us')
-  );
+  const from = message.from || '';
+  const fromPrivate =
+    Boolean(from) &&
+    !from.endsWith('@g.us') &&
+    !from.includes('broadcast');
   if (!(inTargetGroup || fromPrivate)) {
     return false;
   }
@@ -232,6 +280,9 @@ async function tryHandleOwnerCommands(message, body) {
 
 // message_create: propios y ajenos. El evento `message` omite fromMe (tus /activar nunca llegaban).
 client.on('message_create', async (message) => {
+  if (isSystemBroadcastChat(message)) {
+    return;
+  }
   console.log(
     '[MAIN] Mensaje chat:',
     getMessageChatId(message) || message.from,

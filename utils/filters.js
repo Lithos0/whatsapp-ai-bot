@@ -17,6 +17,18 @@ function getMessageChatId(message) {
 }
 
 /**
+ * Estados de WhatsApp y otros "broadcast" del sistema (no son el grupo ni DM del dueño).
+ * Si no se filtran, tryHandleOwnerCommands puede llamar getContact() y agotar protocolTimeout.
+ *
+ * @param {import('whatsapp-web.js').Message} message
+ * @returns {boolean}
+ */
+function isSystemBroadcastChat(message) {
+  const id = getMessageChatId(message) || message.from || '';
+  return id.includes('broadcast');
+}
+
+/**
  * Verifica si el mensaje pertenece al grupo objetivo.
  *
  * @param {import('whatsapp-web.js').Message} message - Mensaje entrante.
@@ -85,6 +97,7 @@ function getSenderPhoneDigits(message) {
 
 module.exports = {
   getMessageChatId,
+  isSystemBroadcastChat,
   isTargetGroup,
   extractPhoneNumber,
   getSenderPhoneDigits,

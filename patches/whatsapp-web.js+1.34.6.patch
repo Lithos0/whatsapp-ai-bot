@@ -1,0 +1,29 @@
+diff --git a/node_modules/whatsapp-web.js/src/Client.js b/node_modules/whatsapp-web.js/src/Client.js
+index f68491f..edd599f 100644
+--- a/node_modules/whatsapp-web.js/src/Client.js
++++ b/node_modules/whatsapp-web.js/src/Client.js
+@@ -241,7 +241,9 @@ class Client extends EventEmitter {
+                 }
+                 let start = Date.now();
+                 let res = false;
+-                while(start > (Date.now() - 30000)){
++                // Antes 30000 ms fijos: en VM lenta el teléfono queda en "Logging in..." y acá salía ready timeout
++                const readyTimeoutMs = this.options.authTimeoutMs || 300000;
++                while(start > (Date.now() - readyTimeoutMs)){
+                     // Check window.Store Injection
+                     res = await this.pupPage.evaluate('window.Store != undefined');
+                     if(res){break;}
+@@ -380,7 +382,12 @@ class Client extends EventEmitter {
+                 await this.authStrategy.afterBrowserInitialized();
+                 this.lastLoggedOut = false;
+             }
+-            await this.inject();
++            try {
++                await this.inject();
++            } catch (err) {
++                // Evita unhandledRejection si la página se cerró o hubo auth/ready timeout
++                console.error('Failed to inject after navigation:', err);
++            }
+         });
+     }
+ 

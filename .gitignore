@@ -10,6 +10,9 @@ node_modules/
 .wwebjs_auth/
 .wwebjs_cache/
 
+# QR temporal para vincular (generado en el servidor)
+last-qr.png
+
 # Sistema / IDE
 .DS_Store
 *.log
