@@ -52,7 +52,13 @@ process.on('unhandledRejection', (reason) => {
 
 const { createWhatsappClient } = require('./services/whatsapp.service');
 const { generateAIResponse } = require('./services/ai.service');
-const { TARGET_GROUP_ID, BOT_OWNER_PHONE } = require('./config');
+const {
+  TARGET_GROUP_ID,
+  BOT_OWNER_PHONE,
+  MODERATION_PROBABILITY_MIN,
+  LEXICON_GATE_ENABLED,
+} = require('./config');
+const { matchPoliticaLexicon } = require('./utils/politica-lexicon');
 const {
   getMessageChatId,
   isSystemBroadcastChat,
@@ -85,8 +91,14 @@ function withModeratorPrefix(text) {
   return `${MODERATOR_PREFIX} ${t}`;
 }
 
-/** Si false, el bot no analiza ni responde en el grupo (salvo comandos del dueño). */
+/** Si false, el bot no analiza ni responde en el grupo (salvo /activar y /desactivar según permisos). */
 let botEnabled = true;
+
+/**
+ * Si true: en el grupo objetivo cualquiera puede usar /activar y /desactivar.
+ * Si false: solo el dueño (BOT_OWNER_PHONE). Solo el dueño puede cambiar esto con /abierto y /cerrado.
+ */
+let publicGroupBotControl = false;
 
 /** Entre avisos [MODERADOR] por política (no aplica a /activar ni /desactivar). */
 const MODERATION_COOLDOWN_MS = 30 * 1000;
@@ -222,6 +234,9 @@ async function replyFromBot(toMessage, text) {
  * whatsapp-web.js NO emite el evento `message` para mensajes propios (fromMe).
  * Solo `message_create` incluye lo que vos enviás desde Web/teléfono vinculado.
  *
+ * Comandos: /abierto y /cerrado (solo dueño) alternan si en el grupo cualquiera puede usar
+ * /activar y /desactivar. En chat privado /activar y /desactivar siguen siendo solo del dueño.
+ *
  * @param {import('whatsapp-web.js').Message} message
  * @param {string} body
  * @returns {Promise<boolean>} true si se manejó un comando
@@ -236,10 +251,54 @@ async function tryHandleOwnerCommands(message, body) {
   if (!(inTargetGroup || fromPrivate)) {
     return false;
   }
-  if (!(await isMessageFromOwner(message))) {
+
+  const cmd = body.toLowerCase();
+  const isOwner = await isMessageFromOwner(message);
+
+  if (cmd === '/abierto' || cmd === '/cerrado') {
+    if (!isOwner) {
+      await replyFromBot(
+        message,
+        'Solo quien configuró el bot (dueño) puede usar /abierto y /cerrado.'
+      );
+      return true;
+    }
+    if (cmd === '/abierto') {
+      publicGroupBotControl = true;
+      await replyFromBot(
+        message,
+        'Listo: modo abierto. En este grupo cualquiera puede usar /activar y /desactivar.\n\n' +
+          'Para volver a que solo el dueño los use, el dueño manda /cerrado.'
+      );
+      console.log('[MAIN] Control del bot en grupo: ABIERTO (cualquiera puede /activar /desactivar).');
+      return true;
+    }
+    publicGroupBotControl = false;
+    await replyFromBot(
+      message,
+      'Listo: modo cerrado. /activar y /desactivar solo los puede usar el dueño del bot.\n\n' +
+        'Para que cualquiera del grupo los use de nuevo, el dueño manda /abierto.'
+    );
+    console.log('[MAIN] Control del bot en grupo: CERRADO (solo dueño /activar /desactivar).');
+    return true;
+  }
+
+  if (cmd !== '/activar' && cmd !== '/desactivar') {
     return false;
   }
-  if (body === '/activar') {
+
+  const canUseActivarDesactivar =
+    isOwner || (inTargetGroup && publicGroupBotControl && !fromPrivate);
+
+  if (!canUseActivarDesactivar) {
+    await replyFromBot(
+      message,
+      'No tenés permiso para /activar o /desactivar: el dueño dejó el control cerrado (solo él/ella). Si sos el dueño y querés que cualquiera del grupo los use, mandá /abierto acá o en privado.'
+    );
+    return true;
+  }
+
+  if (cmd === '/activar') {
     if (botEnabled) {
       await replyFromBot(
         message,
@@ -254,10 +313,12 @@ async function tryHandleOwnerCommands(message, body) {
           '⚠️ Les cuento a todos: voy a hablar recién si la política de partidos de Argentina viene fuerte y se empiezan a subir los tonos. El día a día, el laburo, el fútbol y eso quedan afuera de esto.'
       );
     }
-    console.log('[MAIN] Bot activado por el dueño.');
+    console.log(
+      `[MAIN] Bot activado (${isOwner ? 'dueño' : 'miembro del grupo'}, modo ${publicGroupBotControl ? 'abierto' : 'cerrado'}).`
+    );
     return true;
   }
-  if (body === '/desactivar') {
+  if (cmd === '/desactivar') {
     if (!botEnabled) {
       await replyFromBot(
         message,
@@ -272,10 +333,11 @@ async function tryHandleOwnerCommands(message, body) {
           '⚠️ La idea sigue siendo la misma: no pelearnos por política de partidos o del gobierno de acá. Sin el bot no hay recordatorio automático, así que cuenta la buena onda de cada uno.'
       );
     }
-    console.log('[MAIN] Bot desactivado por el dueño.');
+    console.log(
+      `[MAIN] Bot desactivado (${isOwner ? 'dueño' : 'miembro del grupo'}, modo ${publicGroupBotControl ? 'abierto' : 'cerrado'}).`
+    );
     return true;
   }
-  return false;
 }
 
 // message_create: propios y ajenos. El evento `message` omite fromMe (tus /activar nunca llegaban).
@@ -340,12 +402,39 @@ client.on('message_create', async (message) => {
 
     addToHistory(senderPhone, content.historySummary);
 
+    // Fase 2 — Orden: 1) léxico (solo texto; ahorro de tokens) 2) cola Gemini + IA en ai.service.js
+    // Imágenes, stickers y documentos-imagen: siempre pasan por Gemini (sin filtro léxico).
+    const historyText = groupHistory
+      .map((m) => `${m.sender}: ${m.text}`)
+      .join('\n');
+    const haystack = `${historyText}\n${content.evalDescription}`;
+    const requiresVisionModeration =
+      Array.isArray(content.inlineImages) && content.inlineImages.length > 0;
+
+    if (requiresVisionModeration) {
+      console.log(
+        '[MAIN] Moderación visual (imagen/sticker/archivo imagen): siempre se envía a Gemini (sin filtro léxico).'
+      );
+    } else if (LEXICON_GATE_ENABLED) {
+      const { hit, termsFound } = matchPoliticaLexicon(haystack);
+      if (!hit) {
+        console.log(
+          '[MAIN] Lexicon: sin términos del léxico político; no se llama a Gemini (ahorro de tokens).'
+        );
+        return;
+      }
+      const preview = termsFound.slice(0, 12).join(', ');
+      console.log(
+        `[MAIN] Lexicon: ${termsFound.length} coincidencia(s) — ej.: ${preview}${termsFound.length > 12 ? '…' : ''}`
+      );
+    }
+
     console.log(
       '[MAIN] Mensaje en grupo objetivo (tipo:',
       message.type,
       ', fromMe:',
       message.fromMe,
-      '). Procesando con IA...'
+      '). Encolando consulta a Gemini (tras cola y espacio mínimo entre peticiones)...'
     );
 
     // Generar respuesta con IA usando el historial
@@ -372,7 +461,7 @@ client.on('message_create', async (message) => {
 
     const { probabilidad, respuesta } = aiResponse;
 
-    if (probabilidad > 85 && respuesta) {
+    if (probabilidad > MODERATION_PROBABILITY_MIN && respuesta) {
       const now = Date.now();
       if (now - lastModerationWarningSentAt < MODERATION_COOLDOWN_MS) {
         const restanteSec = Math.ceil(
@@ -388,7 +477,7 @@ client.on('message_create', async (message) => {
       }
     } else {
       console.log(
-        `🤖 Tema no político (${probabilidad}%). El bot se queda en silencio.`
+        `[MAIN] Sin aviso de moderación (probabilidad ${probabilidad}%, umbral ${MODERATION_PROBABILITY_MIN}%).`
       );
     }
   } catch (error) {

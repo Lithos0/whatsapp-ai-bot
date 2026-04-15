@@ -102,6 +102,7 @@ async function buildImageModerationPayload(message, kind) {
 /**
  * Arma el contenido del último mensaje para evaluar política (texto, enlaces, imagen o sticker).
  * No incluye video ni notas de voz.
+ * Imagen, sticker y documento con imagen: siempre llevan inlineImages → el bot envía todo a Gemini (Fase 2).
  *
  * @param {import('whatsapp-web.js').Message} message
  * @returns {Promise<PreparedContent|null>}

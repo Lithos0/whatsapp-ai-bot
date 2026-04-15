@@ -1,11 +1,17 @@
 // services/ai.service.js
 // Servicio de integración con la API de IA (Google Gemini - Google AI Studio).
-// Cola global: mínimo 15 s entre el fin de una petición y el inicio de la siguiente (reduce 429).
+// Cola global: tiempo mínimo entre el fin de una petición y el inicio de la siguiente (reduce 429).
+// Ante 429: reintentos con backoff dentro de la misma tarea en cola (no se libera el slot hasta fallar del todo).
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { AI_API_KEY, SYSTEM_PROMPT } = require('../config');
-
-const MIN_GAP_BETWEEN_GEMINI_REQUESTS_MS = 15 * 1000;
+const {
+  AI_API_KEY,
+  SYSTEM_PROMPT,
+  MODERATION_PROBABILITY_MIN,
+  GEMINI_MIN_GAP_MS,
+  GEMINI_429_MAX_RETRIES,
+  GEMINI_429_BASE_WAIT_MS,
+} = require('../config');
 
 let model = null;
 let queueTail = Promise.resolve();
@@ -26,8 +32,8 @@ function getModelInstance() {
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.75,
-        topP: 0.92,
+        temperature: 0.18,
+        topP: 0.85,
       },
     });
   }
@@ -36,7 +42,30 @@ function getModelInstance() {
 }
 
 /**
- * Una sola llamada a Gemini (sin cola ni espera).
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isRateLimitError(err) {
+  if (!err) {
+    return false;
+  }
+  if (typeof err.status === 'number' && err.status === 429) {
+    return true;
+  }
+  const m = String(err.message || err).toLowerCase();
+  return (
+    m.includes('429') ||
+    m.includes('too many requests') ||
+    m.includes('resource exhausted') ||
+    m.includes('resource has been exhausted') ||
+    m.includes('rate limit') ||
+    m.includes('quota') ||
+    m.includes('exceeded your current quota')
+  );
+}
+
+/**
+ * Una sola llamada a Gemini con reintentos ante 429 (misma tarea en cola).
  *
  * @param {Array<{ sender: string, text: string }>} history
  * @param {{ evalDescription: string, inlineImages?: Array<{ mimeType: string, data: string }> }} payload
@@ -71,12 +100,10 @@ ${historyText}
 Último mensaje a evaluar (texto y, si aplica, imagen/sticker adjuntos en el mismo turno):
 ${evalDescription}
 
-Pista de estilo para ESTE turno (si tenés que escribir "respuesta" porque la probabilidad supera 85): ${estiloTurno}
+Pista de estilo para ESTE turno (solo si "probabilidad" > ${MODERATION_PROBABILITY_MIN} y debés rellenar "respuesta"): ${estiloTurno}
 
-Evaluá si el tema es política partidaria o gubernamental de Argentina según las reglas del sistema. Devolvé solo el JSON requerido; si corresponde respuesta, que sea nueva y pegada a lo que mandaron en este mensaje.
+Evaluá con criterio conservador (ante la duda, probabilidad baja). Devolvé solo el JSON requerido; si corresponde "respuesta", que sea nueva y pegada a lo que mandaron en este mensaje.
 `.trim();
-
-  console.log('[AI SERVICE] Llamando a Gemini con el contexto de conversación...');
 
   const geminiModel = getModelInstance();
 
@@ -89,42 +116,82 @@ Evaluá si el tema es política partidaria o gubernamental de Argentina según l
     }
   }
 
-  const result = await geminiModel.generateContent({
-    contents: [
-      {
-        role: 'user',
-        parts,
-      },
-    ],
-  });
+  const maxAttempts = 1 + Math.max(0, GEMINI_429_MAX_RETRIES);
+  let lastError;
 
-  const response = result.response;
-  const text = (response && response.text && response.text()) || '';
-  const trimmed = (text || '').trim();
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log('[AI SERVICE] Reintento de llamada a Gemini tras límite de tasa...');
+      } else {
+        console.log('[AI SERVICE] Llamando a Gemini con el contexto de conversación...');
+      }
 
-  if (!trimmed) {
-    console.warn('[AI SERVICE] Gemini devolvió una respuesta vacía.');
-    throw new Error('Respuesta vacía de la IA (Gemini)');
+      const result = await geminiModel.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts,
+          },
+        ],
+      });
+
+      const response = result.response;
+      const text = (response && response.text && response.text()) || '';
+      const trimmed = (text || '').trim();
+
+      if (!trimmed) {
+        console.warn('[AI SERVICE] Gemini devolvió una respuesta vacía.');
+        throw new Error('Respuesta vacía de la IA (Gemini)');
+      }
+
+      const parsed = JSON.parse(trimmed);
+
+      if (
+        typeof parsed.probabilidad !== 'number' ||
+        typeof parsed.respuesta !== 'string'
+      ) {
+        throw new Error(
+          'Formato de respuesta inválido: faltan probabilidad o respuesta'
+        );
+      }
+
+      console.log('[AI SERVICE] Respuesta evaluada por Gemini.');
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      const canRetry =
+        isRateLimitError(error) && attempt < maxAttempts - 1;
+      if (!canRetry) {
+        if (error instanceof SyntaxError) {
+          console.error(
+            '[AI SERVICE] La IA no devolvió un JSON válido:',
+            error.message
+          );
+        } else {
+          console.error(
+            '[AI SERVICE] Error al generar respuesta de la IA (Gemini):',
+            error
+          );
+        }
+        throw error;
+      }
+      const waitMs = GEMINI_429_BASE_WAIT_MS * Math.pow(2, attempt);
+      console.warn(
+        `[AI SERVICE] Límite de tasa (429 / too many requests). Esperando ${Math.ceil(
+          waitMs / 1000
+        )}s antes del reintento ${attempt + 2}/${maxAttempts}...`
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
   }
 
-  const parsed = JSON.parse(trimmed);
-
-  if (
-    typeof parsed.probabilidad !== 'number' ||
-    typeof parsed.respuesta !== 'string'
-  ) {
-    throw new Error(
-      'Formato de respuesta inválido: faltan probabilidad o respuesta'
-    );
-  }
-
-  console.log('[AI SERVICE] Respuesta evaluada por Gemini.');
-  return parsed;
+  throw lastError || new Error('Gemini: sin respuesta tras reintentos');
 }
 
 /**
  * Evalúa si el mensaje/conversación trata sobre política argentina.
- * Las peticiones se encolan: mínimo 15 s entre el fin de una y el inicio de la siguiente.
+ * Las peticiones se encolan: GEMINI_MIN_GAP_MS entre el fin de una y el inicio de la siguiente.
  *
  * @param {Array<{ sender: string, text: string }>} history - Últimos mensajes del grupo.
  * @param {{ evalDescription: string, inlineImages?: Array<{ mimeType: string, data: string }> }} payload
@@ -142,12 +209,10 @@ function generateAIResponse(history, payload) {
     queueTail = queueTail.catch(() => {}).then(async () => {
       const now = Date.now();
       if (lastGeminiRequestEndedAt > 0) {
-        const waitMs =
-          MIN_GAP_BETWEEN_GEMINI_REQUESTS_MS -
-          (now - lastGeminiRequestEndedAt);
+        const waitMs = GEMINI_MIN_GAP_MS - (now - lastGeminiRequestEndedAt);
         if (waitMs > 0) {
           console.log(
-            `[AI SERVICE] Cola: esperando ${Math.ceil(waitMs / 1000)}s (espacio mínimo entre peticiones a Gemini).`
+            `[AI SERVICE] Cola: esperando ${Math.ceil(waitMs / 1000)}s (espacio mínimo ${GEMINI_MIN_GAP_MS}ms entre peticiones a Gemini).`
           );
           await new Promise((r) => setTimeout(r, waitMs));
         }
@@ -156,17 +221,6 @@ function generateAIResponse(history, payload) {
         const result = await runGeminiEvaluation(history, payload);
         resolve(result);
       } catch (error) {
-        if (error instanceof SyntaxError) {
-          console.error(
-            '[AI SERVICE] La IA no devolvió un JSON válido:',
-            error.message
-          );
-        } else {
-          console.error(
-            '[AI SERVICE] Error al generar respuesta de la IA (Gemini):',
-            error
-          );
-        }
         reject(error);
       } finally {
         lastGeminiRequestEndedAt = Date.now();

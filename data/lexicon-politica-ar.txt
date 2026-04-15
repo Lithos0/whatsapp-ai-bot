@@ -1,0 +1,470 @@
+# Léxico de referencia para filtro previo (Fase 2). Una línea = un término o frase.
+# NOTA: https://www.diccionarioargentino.com/ es un diccionario de MODISMOS y argot general
+# (ej. "instale", "AHRE", "cringe"), no de política. No se importó ese listado: mezclaría
+# palabras cotidianas sin sesgo político y rompería el filtro. Lo siguiente está curado solo
+# para política argentina (partidos, figuras, instituciones, jerga política frecuente).
+
+# --- Presidentes y figuras nacionales (nombres y apodos) ---
+milei
+javier milei
+karina milei
+villarruel
+victoria villarruel
+caputo
+luis caputo
+cristina
+cristina kirchner
+cfk
+kirchner
+kichner
+nestor kirchner
+néstor kirchner
+nestor
+néstor
+macri
+mauricio macri
+gatillo macri
+menem
+carlos menem
+massa
+sergio massa
+bullrich
+patricia bullrich
+larreta
+horacio larreta
+kicillof
+axel kicillof
+grabois
+juan grabois
+milei presidente
+presidente milei
+alberto fernandez
+alberto fernández
+guzman
+martin guzman
+martín guzmán
+massa ministro
+cfk vice
+cristina vice
+pichetto
+miguel pichetto
+espert
+jose luis espert
+javier milei vice
+myriam bregman
+del caño
+nicolas del caño
+nicolás del caño
+bregman
+tolosa paz
+anibal fernandez
+aníbal fernández
+wado de pedro
+wado
+rossi
+agustin rossi
+agustín rossi
+taiana
+cafiero
+santiago cafiero
+massa presidente
+scioli
+daniel scioli
+massa 2023
+milei 2023
+bullrich 2023
+larreta 2023
+
+# --- Bloques y partidos ---
+pro
+jxc
+juntos por el cambio
+frente de todos
+fdt
+unión cívica radical
+union civica radical
+ucr
+partido justicialista
+pj
+peronismo
+peronista
+peronchos
+antiperonismo
+kirchnerismo
+kirchnerista
+macrismo
+macrista
+menemismo
+libertad avanza
+lla
+la libertad avanza
+coalicion civica
+coalición cívica
+cc-ari
+gen
+partido socialista
+pts
+partido obrero
+izquierda unida
+frente de izquierda
+fit
+fit-u
+nuevo mas
+izquierda socialista
+compromiso federal
+hacemos por cordoba
+hacemos por córdoba
+frente patria grande
+unidos por la patria
+uxp
+frente renovador
+massismo
+radicalismo
+ucrismo
+libertario
+libertarios
+ancap
+mileista
+larretista
+
+# --- Congreso, Estado, elecciones ---
+congreso
+congreso nacional
+senado
+senadores
+diputados
+diputados nacionales
+cámara de diputados
+camara de diputados
+senado de la nacion
+senado de la nación
+casa rosada
+rosada
+balotaje
+ballotage
+segunda vuelta
+paso
+elecciones paso
+elecciones generales
+elecciones 2023
+elecciones 2025
+campaña electoral
+campaña
+candidato
+candidata
+intendente
+gobernador
+gobernadora
+legislatura
+bloque oficialista
+bloque opositor
+interbloque
+sesion especial
+sesión especial
+quorum
+quórum
+dictamen
+ley omnibus
+ley bases
+paquete fiscal
+decreto de necesidad
+dnu
+dnus
+superpoderes
+juicio politico
+juicio político
+impeachment
+grieta
+la grieta
+grieta moral
+operador politico
+operador político
+opereta
+libertarios de ll
+la libertad
+
+# --- Instituciones y siglas frecuentes en debate ---
+bcra
+banco central
+anses
+afip
+arca
+ministerio de economia
+ministerio de economía
+ministerio del interior
+corte suprema
+csjn
+procuracion
+procuración
+jefatura de gabinete
+jefes de gabinete
+secretario de energia
+secretario de energía
+subsecretario
+
+# --- Medios y espacio público político ---
+plaza de mayo
+plaza italia
+obelisco
+9 de julio
+marcha
+movilizacion
+movilización
+piquete
+paro nacional
+paro general
+cgt
+cta
+moyano
+daer
+triunvirato
+
+# --- Jerga y memes políticos (Argentina) ---
+peroncho
+gorila
+gorilas
+zurdos
+zurdo
+facho
+fachos
+libervirgo
+kuka
+kukas
+ñoqui
+ñoquis
+plan platita
+fondo del conurbano
+conurbano bonaerense
+bonaerense
+corte de ruta
+cacerolazo
+cacerolazos
+8n
+19f
+24m
+25 de mayo
+cabildo abierto
+
+# --- Política local fuerte en redes ---
+milei dolar
+milei inflacion
+milei inflación
+milei bcra
+massa dolar
+cfk condenada
+causa vialidad
+vialidad
+hotesur
+los sauces
+doble indemnizacion
+doble indemnización
+
+# --- Referencias internacionales frecuentes en charla política local ---
+donald trump
+joe biden
+bolsonaro
+lula
+maduro
+chavez
+chávez
+castro
+milei trump
+
+# --- Ampliación: figuras y política provincial / histórica ---
+alfonsin
+raúl alfonsin
+raul alfonsin
+de la rua
+de la rúa
+adolfo rodriguez saa
+adolfo rodríguez saá
+duhalde
+eduardo duhalde
+nestor kirchner murio
+kirchnerismo y peronismo
+radicalismo argentino
+frigerio
+mario meoni
+meoni
+ginés gonzalez garcia
+ginés gonzález garcía
+carreras
+gildo insfran
+insfran
+ziliotto
+capitanich
+capitanich
+quintela
+jalil
+manzur
+juan manzur
+schiavoni
+urtubey
+monzo
+emilio monzó
+negri
+mario negri
+lousteau
+martin lousteau
+lousteau
+stolbizer
+margarita stolbizer
+carrio
+elisa carrio
+carrió
+solanas
+fernando solanas
+film politico argentino
+film político argentino
+
+# --- Instituciones y organismos ---
+ministerio de seguridad
+ministerio de salud
+pami
+anses jubilados
+jubilados de la anses
+ley de medios
+ley de alquileres
+ley omnibus debate
+presupuesto 2024
+presupuesto 2025
+deuda con el fmi
+fmi
+fondo monetario
+club de paris
+bce
+lebac
+leliq
+cepo
+cepo cambiario
+bonos argentinos
+vaca muerta
+yacimientos
+ypf
+aerolineas argentinas
+aerolíneas argentinas
+aerolineas
+intervencion del pj
+intervención del pj
+
+# --- Debate público y redes ---
+troll center
+trollcenter
+ciberpatrullaje
+bot militante
+cuenta militante
+operacion clamor
+operación clamor
+lawfare
+lawfare argentina
+causa judicial
+procesamiento
+prision preventiva
+prisión preventiva
+domiciliaria
+condenada por corrupcion
+condenada por corrupción
+corrupcion k
+corrupción k
+rosca judicial
+mesa judicial
+golpe blando
+golpe institucional
+golpe de estado
+golpe de estado blando
+autogolpe
+autogolpe
+
+# --- Elecciones y fechas ---
+elecciones legislativas
+elecciones municipales
+elecciones provinciales
+paso abiertas
+simultaneas
+simultáneas
+voto electronico
+voto electrónico
+boleta unica
+boleta única
+voto obligatorio
+padron electoral
+padrón electoral
+fiscal de mesa
+fiscalización
+impugnacion de boletas
+impugnación de boletas
+
+# --- Jerga adicional (solo política) ---
+plan platita
+plan social
+planes sociales
+plan auh
+asignacion universal
+asignación universal
+ife
+ife 4
+potenciar trabajo
+potenciar trabajo plan
+corte en la 9 de julio
+9 de julio obelisco
+obelisco marcha
+plaza de mayo 24
+plaza de mayo 25
+cacerolazo contra
+cacerolazo a favor
+banderazo
+banderazo en el obelisco
+caravana libertad
+caravana libertaria
+
+# --- Medios y programas políticos (referencia frecuente) ---
+678
+odisea argentina
+odisea argentina programa
+lanata
+jorge lanata
+majul
+luis majul
+leuco
+brancatelli
+ernesto tenembaum
+tenembaum
+victor hugo morales
+victor hugo
+canal de la ciudad
+tn noticias politica
+c5n politica
+a24 politica
+ln mas politica
+infobae politica
+pagina 12
+página 12
+ambito financiero politica
+ámbito financiero política
+
+# --- Más nombres y variantes ---
+maximo kirchner
+máximo kirchner
+florencia kirchner
+lazaro baez
+lázaro báez
+báez
+cristobal lopez
+cristóbal lópez
+lopez
+lópez
+de vido
+julio de vido
+jose lopez
+josé lópez
+los cuadernos
+cuadernos de las coimas
+ruta del dinero k
+ruta del dinero
+hoteleros kirchner
+hotesur
+hotesur caso
+corrupcion en obra publica
+corrupción en obra pública
+obra publica
+obra pública
